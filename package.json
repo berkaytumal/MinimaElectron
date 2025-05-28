@@ -7,7 +7,7 @@
     "start": "electron .",
     "test": "echo \"Error: no test specified\" && exit 1",
     "postinstall": "node postscript.js",
-    "reset": "node -e \"require('fs').rmSync('./minidata1', { recursive: true, force: true }); require('keytar').deletePassword('minima-electron','mds-password').then(()=>console.log('Password and /minidata1 removed.'))\"",
+    "reset": "node -e \"const { app } = require('electron'); const path = require('path'); const dataPath = app.isPackaged ? path.join(app.getPath('userData'), 'minidata') : './minidata1'; require('fs').rmSync(dataPath, { recursive: true, force: true }); require('keytar').deletePassword('minima-electron','mds-password').then(()=>console.log('Password and data directory removed.'))\"",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
     "make:mac": "electron-builder --mac --universal",
@@ -30,13 +30,11 @@
     "productName": "Minima",
     "files": [
       "**/*",
-      "!minidata1/**/*"
+      "!minidata1/**/*",
+      "!minidata/**/*"
     ],
     "extraResources": [
-      {
-        "from": ".",
-        "filter": ["minima.jar"]
-      }
+      "minima.jar"
     ],
     "directories": {
       "buildResources": "assets"

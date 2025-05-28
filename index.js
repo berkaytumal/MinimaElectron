@@ -80,18 +80,57 @@ async function runMinima(password, win) {
   let minimaPath = 'minima.jar';
   if (app.isPackaged) {
     minimaPath = path.join(process.resourcesPath, 'minima.jar');
+    console.log('Using packaged JAR at:', minimaPath);
+    // Check if the JAR file exists
+    if (!fs.existsSync(minimaPath)) {
+      console.error('JAR file not found at expected location:', minimaPath);
+      win.webContents.executeJavaScript(`alert('Could not find minima.jar. Please contact support.')`);
+      return;
+    }
   }
 
+  // Create a data directory in the user's app data directory
+  let dataDir = 'minidata1';
+  if (app.isPackaged) {
+    // Use app data directory for packaged app
+    dataDir = path.join(app.getPath('userData'), 'minidata');
+    // Ensure the directory exists
+    if (!fs.existsSync(dataDir)) {
+      try {
+        fs.mkdirSync(dataDir, { recursive: true });
+        console.log('Created data directory at:', dataDir);
+      } catch (err) {
+        console.error('Failed to create data directory:', err);
+      }
+    }
+  }
+  
   const args = [
     '-jar', minimaPath,
-    '-data', 'minidata1',
-    '-basefolder', 'minidata1',
+    '-data', dataDir,
+    '-basefolder', dataDir,
     '-mdsenable',
     '-mdspassword', password
   ];
+  console.log('Starting Java with args:', args);
+  
+  // Check if Java is available
+  const javaProcess = spawn('java', ['-version']);
+  javaProcess.on('error', (err) => {
+    console.error('Java not found:', err);
+    win.webContents.executeJavaScript(`alert('Java runtime is not available. Please install Java and try again.')`);
+    return;
+  });
+  
   const java = spawn('java', args);
   global.java = java; // Store globally to access in other parts of the app
   let webviewAdded = false;
+  
+  java.on('error', (err) => {
+    console.error('Failed to start Java process:', err);
+    win.webContents.executeJavaScript(`alert('Failed to start Minima: ${err.message}')`);
+  });
+  
   java.stdout.on('data', (data) => {
     const str = data.toString();
     process.stdout.write(str);
@@ -234,17 +273,63 @@ app.whenReady().then(() => {
         {
           label: 'Reset',
           click: () => {
-            // Run "npm run reset"
-            exec('npm run reset', { cwd: process.cwd() }, (error, stdout, stderr) => {
-              if (error) {
-                console.error(`Error running reset: ${error.message}`);
-                return;
+            // If packaged, delete the data directory and clear password
+            if (app.isPackaged) {
+              const dataDir = path.join(app.getPath('userData'), 'minidata');
+              try {
+                if (fs.existsSync(dataDir)) {
+                  fs.rmSync(dataDir, { recursive: true, force: true });
+                }
+                keytar.deletePassword(SERVICE, ACCOUNT)
+                  .then(() => {
+                    console.log('Password and data directory removed.');
+                    app.relaunch();
+                    app.exit(0);
+                  })
+                  .catch(err => {
+                    console.error('Failed to delete password:', err);
+                    app.relaunch();
+                    app.exit(0);
+                  });
+              } catch (err) {
+                console.error('Error during reset:', err);
+                app.relaunch();
+                app.exit(0);
               }
-              if (stdout) console.log(stdout);
-              if (stderr) console.error(stderr);
-              // Restart the app after reset
-              app.relaunch();
-              app.exit(0);
+            } else {
+              // In development, run npm reset
+              exec('npm run reset', { cwd: process.cwd() }, (error, stdout, stderr) => {
+                if (error) {
+                  console.error(`Error running reset: ${error.message}`);
+                  return;
+                }
+                if (stdout) console.log(stdout);
+                if (stderr) console.error(stderr);
+                // Restart the app after reset
+                app.relaunch();
+                app.exit(0);
+              });
+            }
+          }
+        },
+        {
+          label: 'Show App Info',
+          click: () => {
+            const info = {
+              isPackaged: app.isPackaged,
+              appPath: app.getAppPath(),
+              resourcesPath: process.resourcesPath,
+              userData: app.getPath('userData'),
+              minimaJarPath: app.isPackaged ? path.join(process.resourcesPath, 'minima.jar') : 'minima.jar',
+              minimaJarExists: app.isPackaged ? 
+                fs.existsSync(path.join(process.resourcesPath, 'minima.jar')) : 
+                fs.existsSync('minima.jar')
+            };
+            dialog.showMessageBox({
+              title: 'App Information',
+              message: 'Application Information',
+              detail: JSON.stringify(info, null, 2),
+              buttons: ['OK']
             });
           }
         },
