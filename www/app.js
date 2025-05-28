@@ -2,7 +2,7 @@ const { ipcRenderer } = require('electron');
 
 document.addEventListener('DOMContentLoaded', () => {
   const container = document.getElementById('container');
-  
+
   // HTML templates for different views
   const templates = {
     loading: `
@@ -53,7 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Function to show options when Minima is already running
   function showMinimaAlreadyRunning() {
     container.innerHTML = templates.alreadyRunning;
-    
+
     // Add event listeners
     document.getElementById('connect-button').addEventListener('click', () => {
       ipcRenderer.send('connect-to-minima');
@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const passwordInput = document.getElementById('password-input');
     const submitButton = document.getElementById('submit-button');
     const errorMessage = document.getElementById('error-message');
-    
+
     // Function to validate and submit the password
     const submitPassword = () => {
       const password = passwordInput.value;
@@ -97,14 +97,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Add event listeners
     submitButton.addEventListener('click', submitPassword);
-    
+
     // Allow enter key to submit
     passwordInput.addEventListener('keypress', (e) => {
       if (e.key === 'Enter') {
         submitPassword();
       }
     });
-    
+
     // Auto-focus password input for better UX
     passwordInput.focus();
   }
@@ -127,23 +127,21 @@ document.addEventListener('DOMContentLoaded', () => {
       document.body.appendChild(webview);
 
       // After adding to DOM, set up event listeners for the webview
-      webview.addEventListener('dom-ready', () => {
-        console.log('Webview DOM ready');
-
-        // Load and apply the CSS
+      function injectCSS() {
+        // Load and apply CSS styles to the webview
         fetch('webview.css')
           .then(response => response.text())
           .then(cssContent => {
-            webview.executeJavaScript(`
-              const style = document.createElement('style');
-              style.textContent = \`${cssContent.replace(/`/g, '\\`')}\`;
-              document.head.appendChild(style);
-            `);
+            webview.insertCSS(cssContent);
           })
           .catch(err => {
             console.error('Failed to load webview.css:', err);
           });
-      });
+      }
+      webview.addEventListener('did-attach', injectCSS);
+      webview.addEventListener('dom-ready', injectCSS);
+      webview.addEventListener('will-navigate', injectCSS);
+      
 
       webview.addEventListener('did-fail-load', (event) => {
         console.error('Webview failed to load:', event);
