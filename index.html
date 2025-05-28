@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Minima Electron</title>
+  <style>
+    body { font-family: sans-serif; background: #f7f7f7; margin: 0; padding: 0; display: flex; align-items: center; justify-content: center; height: 100vh; }
+    #container { background: #fff; padding: 2em 3em; border-radius: 10px; box-shadow: 0 2px 16px #0001; min-width: 320px; }
+    h2 { margin-top: 0; }
+    label { display: block; margin-bottom: 0.5em; }
+    input[type="password"] { width: 100%; padding: 0.5em; margin-bottom: 1em; border-radius: 5px; border: 1px solid #ccc; }
+    button { padding: 0.5em 1.5em; border: none; border-radius: 5px; background: #0078d7; color: #fff; font-size: 1em; cursor: pointer; }
+    .error { color: #c00; margin-bottom: 1em; }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <h2>Set Minima MDS Password</h2>
+    <form id="passwordForm">
+      <label for="password">Enter a password for Minima MDS:</label>
+      <input type="password" id="password" required autocomplete="new-password" />
+      <div class="error" id="error"></div>
+      <button type="submit">Save & Start Minima</button>
+    </form>
+  </div>
+  <script>
+    const { ipcRenderer } = require('electron');
+    const form = document.getElementById('passwordForm');
+    const errorDiv = document.getElementById('error');
+    form.onsubmit = (e) => {
+      e.preventDefault();
+      const password = document.getElementById('password').value;
+      if (!password) {
+        errorDiv.textContent = 'Password is required.';
+        return;
+      }
+      ipcRenderer.send('set-password', password);
+    };
+    ipcRenderer.on('password-error', (_, msg) => {
+      errorDiv.textContent = msg;
+    });
+  </script>
+</body>
+</html>

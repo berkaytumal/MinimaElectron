@@ -1,0 +1,18 @@
+:root {
+    --title-bar-height: 50px;
+}
+
+div.grid.grid-cols-12.h-full>div.svg.col-span-9.flex.items-center.justify-end>div {
+    transform: translateY(var(--title-bar-height));
+}
+
+body {
+    padding-top: var(--title-bar-height);
+}
+
+.bg-minima,
+body,
+html {
+    background: none !important;
+    background-color: transparent !important;
+}

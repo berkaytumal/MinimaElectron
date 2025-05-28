@@ -1,0 +1,64 @@
+{
+  "name": "minima-electron",
+  "productName": "Minima Electron",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "postinstall": "node postscript.js",
+    "reset": "node -e \"require('fs').rmSync('./minidata1', { recursive: true, force: true }); require('keytar').deletePassword('minima-electron','mds-password').then(()=>console.log('Password and /minidata1 removed.'))\"",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "make:mac": "electron-builder --mac --universal",
+    "make:win": "electron-builder --win",
+    "make:linux": "electron-builder --linux"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "Minima blockchain desktop application",
+  "devDependencies": {
+    "electron": "^36.3.1",
+    "electron-builder": "^26.0.12"
+  },
+  "dependencies": {
+    "keytar": "^7.9.0"
+  },
+  "build": {
+    "appId": "io.minima.electron",
+    "productName": "Minima",
+    "files": [
+      "**/*",
+      "!minidata1/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": ".",
+        "filter": ["minima.jar"]
+      }
+    ],
+    "directories": {
+      "buildResources": "assets"
+    },
+    "mac": {
+      "category": "public.app-category.finance",
+      "target": ["dmg"],
+      "icon": "assets/icon.iconset",
+      "artifactName": "${productName}-${version}-universal.${ext}"
+    },
+    "win": {
+      "target": ["nsis"],
+      "icon": "assets/icon.iconset/icon_256x256.png"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "assets/icon.iconset/icon_512x512.png",
+      "category": "Finance"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
+  }
+}

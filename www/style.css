@@ -1,0 +1,112 @@
+:root {
+    --title-bar-height: 50px;
+}
+
+body {
+    font-family: sans-serif;
+    background-image: url("./../assets/background.svg");
+    background-color: #08090B;
+    background-size: cover;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+}
+
+#container {
+    background: #282B2E;
+    color: white;
+    padding: 2em 3em;
+    border-radius: 10px;
+    box-shadow: 0 2px 16px #0001;
+    min-width: 320px;
+    text-align: center;
+}
+
+h3 {
+    margin-top: 0;
+}
+
+.loading {
+    text-align: center;
+}
+
+.password-prompt,
+.minima-already-running {
+    text-align: center;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.button-group {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin-top: 20px;
+}
+
+input[type="password"] {
+    width: 100%;
+    padding: 0.5em;
+    margin-bottom: 0;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+}
+
+button {
+    padding: 0.5em 1.5em;
+    border: none;
+    border-radius: 5px;
+    background: #0078d7;
+    color: #fff;
+    font-size: 1em;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+button:hover {
+    background: #0069c0;
+}
+
+.primary-button {
+    background: #0078d7;
+}
+
+.secondary-button {
+    background: #555;
+}
+
+.secondary-button:hover {
+    background: #444;
+}
+
+.error {
+    color: #c00;
+    font-size: 0.9em;
+    height: 18px;
+}
+
+#title-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--title-bar-height);
+    app-region: drag;
+    background-color: transparent;
+    z-index: 99999;
+}
+
+.bg-minima,
+body,
+html {
+    background: none !important;
+    background-color: transparent !important;
+}
