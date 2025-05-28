@@ -17,7 +17,7 @@ const CONFIG = {
     JAR: app.isPackaged ? path.join(process.resourcesPath, 'minima.jar') : 'minima.jar',
     DATA_DIR: app.isPackaged ? path.join(app.getPath('userData'), 'minidata') : 'minidata1',
     ICON: path.join(__dirname, 'assets/icon.png'),
-    TRAY_ICON: path.join(__dirname, process.platform === 'darwin' ? 'assets/tray/tray.png' : 'assets/icon.png')
+    TRAY_ICON: path.join(__dirname, 'assets/tray/tray.png')
   }
 };
 
@@ -52,11 +52,11 @@ const passwordManager = {
       return null;
     }
   },
-  
+
   async save(password) {
     await keytar.setPassword(CONFIG.SERVICE, CONFIG.ACCOUNT, password);
   },
-  
+
   async delete() {
     return keytar.deletePassword(CONFIG.SERVICE, CONFIG.ACCOUNT);
   }
@@ -67,7 +67,7 @@ async function killExistingMinima() {
   const cmd = process.platform === 'win32'
     ? 'taskkill /F /FI "IMAGENAME eq java.exe" /FI "WINDOWTITLE eq *minima*"'
     : "pkill -f 'java.*minima\\.jar'";
-    
+
   return new Promise((resolve) => {
     exec(cmd, () => {
       // Wait a bit for the process to fully terminate
@@ -79,7 +79,7 @@ async function killExistingMinima() {
 async function runMinima(password, win) {
   // Check if Minima ports are already in use
   const [port9001InUse, port9003InUse] = await Promise.all([
-    isPortInUse(CONFIG.PORTS.MINIMA), 
+    isPortInUse(CONFIG.PORTS.MINIMA),
     isPortInUse(CONFIG.PORTS.MDS)
   ]);
 
@@ -91,7 +91,7 @@ async function runMinima(password, win) {
 
   const minimaPath = CONFIG.PATHS.JAR;
   const dataDir = CONFIG.PATHS.DATA_DIR;
-  
+
   // Check if the JAR file exists
   if (!fs.existsSync(minimaPath)) {
     console.error('JAR file not found at expected location:', minimaPath);
@@ -108,7 +108,7 @@ async function runMinima(password, win) {
       console.error('Failed to create data directory:', err);
     }
   }
-  
+
   const args = [
     '-jar', minimaPath,
     '-data', dataDir,
@@ -117,51 +117,51 @@ async function runMinima(password, win) {
     '-mdspassword', password
   ];
   console.log('Starting Java with args:', args.filter(arg => arg !== password).concat(['[PASSWORD]']));
-  
+
   // Check if Java is available before starting Minima
   try {
     const javaCheck = spawn('java', ['-version']);
-    
+
     javaCheck.on('error', (err) => {
       console.error('Java not found:', err);
       win.webContents.executeJavaScript(`alert('Java runtime is not available. Please install Java and try again.')`);
       throw new Error('Java not available');
     });
-    
+
     await new Promise((resolve, reject) => {
       javaCheck.on('close', code => code === 0 ? resolve() : reject(new Error(`Java check failed with code ${code}`)));
       setTimeout(resolve, 1000); // Timeout if it doesn't exit quickly
     });
-    
+
     // Start Minima process after Java check succeeds
     const java = spawn('java', args);
     global.java = java; // Store globally to access in other parts of the app
     let webviewAdded = false;
-    
+
     // Handle process events
     java.on('error', (err) => {
       console.error('Failed to start Java process:', err);
       win.webContents.executeJavaScript(`alert('Failed to start Minima: ${err.message}')`);
     });
-    
+
     java.stdout.on('data', (data) => {
       const str = data.toString();
       process.stdout.write(str);
-      
+
       // Check for specific output patterns
       if (str.includes('SERIOUS ERROR loadAllDB')) {
         win.webContents.send('database-lock-error');
         return;
       }
-      
+
       if (!webviewAdded && str.includes('SSL server started on port 9003')) {
         webviewAdded = true;
         win.webContents.send('minima-ready');
       }
     });
-    
+
     java.stderr.on('data', (data) => process.stderr.write(data.toString()));
-    
+
     java.on('close', code => {
       if (code !== 0 && code !== null) {
         win.webContents.executeJavaScript(`alert('Minima exited with code ${code}')`);
@@ -181,6 +181,8 @@ function createWindow() {
     icon: CONFIG.PATHS.ICON,
     transparent: true,
     titleBarStyle: 'hidden',
+    vibrancy: 'fullscreen-ui', // Use 'light' for blur with white borders
+    backgroundMaterial: "acrylic",
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,
@@ -188,11 +190,6 @@ function createWindow() {
       webSecurity: true
     }
   });
-  
-  // Apply vibrancy effect on macOS
-  if (process.platform === 'darwin') {
-    mainWindow.setVibrancy('under-window');
-  }
 
   // Handle certificate errors - allow self-signed certificates for localhost
   app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
@@ -206,7 +203,7 @@ function createWindow() {
 
   // Set up IPC event handlers
   setupIpcHandlers();
-  
+
   // Handle window close event - minimize to tray instead
   mainWindow.on('close', (event) => {
     if (!app.isQuitting) {
@@ -236,7 +233,7 @@ function setupIpcHandlers() {
 
   ipcMain.on('restart-minima', async () => {
     await killExistingMinima();
-    
+
     // Wait for ports to free up, then start Minima
     setTimeout(async () => {
       const password = await passwordManager.get();
@@ -267,7 +264,7 @@ async function initializeMinima() {
       isPortInUse(CONFIG.PORTS.MINIMA),
       isPortInUse(CONFIG.PORTS.MDS)
     ]);
-    
+
     const minimaAlreadyRunning = port9001InUse || port9003InUse;
 
     // Wait for window to be ready
@@ -283,7 +280,7 @@ async function initializeMinima() {
 
     // Normal flow for starting Minima when it's not running
     const password = await passwordManager.get();
-    
+
     if (!password) {
       mainWindow.webContents.send('show-password-prompt');
     } else {
@@ -303,7 +300,7 @@ async function resetApp() {
       if (fs.existsSync(CONFIG.PATHS.DATA_DIR)) {
         fs.rmSync(CONFIG.PATHS.DATA_DIR, { recursive: true, force: true });
       }
-      
+
       // Delete password from keychain
       await passwordManager.delete();
       console.log('Password and data directory removed.');
@@ -352,7 +349,7 @@ function createAppMenu() {
               minimaJarPath: CONFIG.PATHS.JAR,
               minimaJarExists: fs.existsSync(CONFIG.PATHS.JAR)
             };
-            
+
             dialog.showMessageBox({
               title: 'App Information',
               message: 'Application Information',
@@ -424,7 +421,7 @@ function createTray() {
 // Initialize app when ready
 app.whenReady().then(() => {
   createAppMenu();
-  
+
   // For macOS, set the dock icon
   if (process.platform === 'darwin') {
     app.dock.setIcon(CONFIG.PATHS.ICON);

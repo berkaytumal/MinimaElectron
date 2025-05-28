@@ -41,16 +41,23 @@
     },
     "mac": {
       "category": "public.app-category.finance",
-      "target": ["dmg"],
+      "target": [
+        "dmg"
+      ],
       "icon": "assets/icon.iconset",
       "artifactName": "${productName}-${version}-universal.${ext}"
     },
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "assets/icon.iconset/icon_256x256.png"
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "icon": "assets/icon.iconset/icon_512x512.png",
       "category": "Finance"
     },
