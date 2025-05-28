@@ -55,9 +55,13 @@ jobs:
 
       - name: Build Mac
         run: npm run make:mac
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Mac Build
         uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: ./dist/Minima-${{ needs.create-release.outputs.version }}-universal.dmg
@@ -81,9 +85,13 @@ jobs:
 
       - name: Build Windows
         run: npm run make:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload Windows Build
         uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: ./dist/Minima Setup ${{ needs.create-release.outputs.version }}.exe
