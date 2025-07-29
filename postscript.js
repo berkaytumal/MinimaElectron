@@ -10,13 +10,8 @@ const CONFIG = {
   USER_AGENT: 'minima-electron-installer'
 };
 
-/**
- * Downloads a file from the given URL to the specified destination
- * Handles redirects automatically
- * @param {string} url - Source URL
- * @param {string} dest - Destination file path
- * @param {Function} cb - Callback on completion
- */
+// Downloads a file from the given URL to the specified destination
+// Handles redirects automatically
 function downloadFile(url, dest, cb) {
   const file = fs.createWriteStream(dest);
   
@@ -49,12 +44,8 @@ function downloadFile(url, dest, cb) {
   });
 }
 
-/**
- * Extracts SHA-256 hash from GitHub release body
- * @param {string} body - Release notes body
- * @param {string} jarName - JAR filename to find hash for
- * @returns {string|null} - Extracted hash or null
- */
+// Extracts SHA-256 hash from GitHub release body
+// Returns extracted hash or null
 function getHashFromReleaseBody(body, jarName) {
   // Find minima-*.jar: `0xHASH` or minima-*.jar: 0xHASH
   const regex = /minima[-\w\.]*\.jar: [`']?(0x)?([A-Fa-f0-9]{64})[`']?/;
@@ -62,11 +53,8 @@ function getHashFromReleaseBody(body, jarName) {
   return match ? match[2].toLowerCase() : null;
 }
 
-/**
- * Calculates SHA-256 hash of a file
- * @param {string} filePath - Path to file
- * @returns {Promise<string>} - Hash as hex string (lowercase)
- */
+// Calculates SHA-256 hash of a file
+// Returns Promise with hash as hex string (lowercase)
 function calculateFileHash(filePath) {
   return new Promise((resolve, reject) => {
     const hash = crypto.createHash('sha256');
@@ -78,9 +66,7 @@ function calculateFileHash(filePath) {
   });
 }
 
-/**
- * Downloads the latest minima.jar or falls back to default
- */
+// Downloads the latest minima.jar or falls back to default
 async function downloadLatestMinima() {
   console.log('Fetching latest Minima release info...');
   
@@ -182,9 +168,7 @@ async function downloadLatestMinima() {
   }
 }
 
-/**
- * Downloads the default minima.jar as fallback
- */
+// Downloads the default minima.jar as fallback
 function downloadDefaultJar() {
   console.log(`Downloading default minima.jar from ${CONFIG.DEFAULT_JAR_URL}...`);
   
