@@ -7,7 +7,7 @@
     "start": "electron .",
     "test": "echo \"Error: no test specified\" && exit 1",
     "postinstall": "node postscript.js",
-    "reset": "node -e \"const { app } = require('electron'); const path = require('path'); const dataPath = app?.isPackaged ? path.join(app.getPath('userData'), 'minidata') : './minidata1'; require('fs').rmSync(dataPath, { recursive: true, force: true }); require('keytar').deletePassword('minima-electron','mds-password').then(()=>console.log('Password and data directory removed.'))\"",
+    "reset": "node reset.js",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
     "make:mac": "electron-builder --mac --universal",

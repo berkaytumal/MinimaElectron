@@ -294,6 +294,24 @@ async function initializeMinima() {
 
 // Reset application data and restart
 async function resetApp() {
+  const { dialog } = require('electron');
+  
+  // Show native confirmation dialog
+  const result = await dialog.showMessageBox(mainWindow, {
+    type: 'warning',
+    buttons: ['Cancel', 'Reset'],
+    defaultId: 0,
+    cancelId: 0,
+    title: 'Reset Minima',
+    message: 'Reset Minima Data',
+    detail: 'This will permanently delete all Minima data and saved passwords. Are you sure?'
+  });
+  
+  // If user clicked Cancel (button index 0), return early
+  if (result.response === 0) {
+    return;
+  }
+  
   try {
     if (app.isPackaged) {
       // Delete data directory if it exists
@@ -305,9 +323,9 @@ async function resetApp() {
       await passwordManager.delete();
       console.log('Password and data directory removed.');
     } else {
-      // In development, run npm reset
+      // In development, run npm reset with confirmation flag
       await new Promise((resolve, reject) => {
-        exec('npm run reset', { cwd: process.cwd() }, (error, stdout, stderr) => {
+        exec('npm run reset -- --confirm', { cwd: process.cwd() }, (error, stdout, stderr) => {
           if (error) {
             console.error(`Error running reset: ${error.message}`);
             reject(error);
