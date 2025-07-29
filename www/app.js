@@ -1,7 +1,7 @@
 const { ipcRenderer } = require('electron');
 
 document.addEventListener('DOMContentLoaded', () => {
-  const container = document.getElementById('container');
+  let container = document.getElementById('container');
 
   // HTML templates for different views
   const templates = {
@@ -42,6 +42,20 @@ document.addEventListener('DOMContentLoaded', () => {
           <button id="submit-button">Save & Start Minima</button>
         </div>
       </div>
+    `,
+    connectionError: `
+      <div class="minima-already-running error-container">
+        <h3>Connection Error</h3>
+        <p>Failed to connect to the existing Minima instance.</p>
+        <div class="error-details">
+          <pre>ERR_CONNECTION_REFUSED - The Minima service may have stopped unexpectedly.</pre>
+        </div>
+        <div class="button-group">
+          <button id="reload-button" class="primary-button">Reload Connection</button>
+          <button id="restart-service-button" class="secondary-button">Restart Service</button>
+          <button id="quit-button" class="secondary-button">Quit</button>
+        </div>
+      </div>
     `
   };
 
@@ -73,6 +87,26 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('restart-button').addEventListener('click', () => {
       ipcRenderer.send('restart-minima');
       showLoading();
+    });
+  }
+
+  // Function to show connection error
+  function showConnectionError() {
+    container.innerHTML = templates.connectionError;
+
+    // Add event listeners
+    document.getElementById('reload-button').addEventListener('click', () => {
+      ipcRenderer.send('reload-webview');
+      showLoading();
+    });
+
+    document.getElementById('restart-service-button').addEventListener('click', () => {
+      ipcRenderer.send('restart-minima');
+      showLoading();
+    });
+
+    document.getElementById('quit-button').addEventListener('click', () => {
+      ipcRenderer.send('quit-app');
     });
   }
 
@@ -147,6 +181,17 @@ document.addEventListener('DOMContentLoaded', () => {
         console.error('Webview failed to load:', event);
         if (event.errorCode === -202) { // Certificate error
           console.log('Certificate error detected, will retry with bypass');
+        } else if (event.errorCode === -102) { // ERR_CONNECTION_REFUSED
+          console.log('Connection refused, showing connection error');
+          // Remove webview and show connection error
+          webview.remove();
+          // Recreate container
+          const newContainer = document.createElement('div');
+          newContainer.id = 'container';
+          document.body.appendChild(newContainer);
+          // Update container reference
+          container = newContainer;
+          showConnectionError();
         }
       });
     }
@@ -157,6 +202,7 @@ document.addEventListener('DOMContentLoaded', () => {
     'show-password-prompt': showPasswordPrompt,
     'minima-already-running': showMinimaAlreadyRunning,
     'database-lock-error': showDatabaseLockError,
+    'connection-error': showConnectionError,
     'minima-ready': renderWebview,
     'password-error': (_, msg) => {
       if (msg) {

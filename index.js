@@ -1,9 +1,18 @@
-const { app, BrowserWindow, ipcMain, Menu, dialog, Tray, nativeImage } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
+
+// Suppress SSL error logs from Chromium
+app.commandLine.appendSwitch('--disable-logging');
+app.commandLine.appendSwitch('--log-level', '3'); // Only show fatal errors
+app.commandLine.appendSwitch('--disable-dev-shm-usage');
+app.commandLine.appendSwitch('--no-sandbox');
+
 const { spawn, exec } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const keytar = require('keytar');
 const net = require('net');
+const TrayManager = require('./modules/tray');
+const SettingsManager = require('./modules/settings');
 
 // Configuration constants
 const CONFIG = {
@@ -15,15 +24,35 @@ const CONFIG = {
   },
   PATHS: {
     JAR: app.isPackaged ? path.join(process.resourcesPath, 'minima.jar') : 'minima.jar',
-    DATA_DIR: app.isPackaged ? path.join(app.getPath('userData'), 'minidata') : 'minidata1',
+    DATA_DIR: app.isPackaged || process.argv.includes('--force-user-path') ? path.join(app.getPath('userData'), 'minidata') : 'minidata1',
     ICON: path.join(__dirname, 'assets/icon.png'),
     TRAY_ICON: path.join(__dirname, 'assets/tray/tray.png')
+  },
+  JAVA_LOG: {
+    ENABLED: {
+      STDOUT: false,
+      STDERR: true,
+      PROCESS_EVENTS: true,
+      PATTERN_MATCHING: true
+    },
+    LEVELS: {
+      ERROR: 'ERROR',
+      WARN: 'WARN',
+      INFO: 'INFO',
+      DEBUG: 'DEBUG'
+    },
+    PATTERNS: {
+      SSL_READY: 'SSL server started on port 9003',
+      DATABASE_ERROR: 'SERIOUS ERROR loadAllDB',
+      STARTUP_COMPLETE: 'Minima startup complete'
+    }
   }
 };
 
-// Global variables for tray and main window
+// Global variables for main window and modules
 let mainWindow;
-let tray = null;
+let trayManager;
+let settingsManager;
 
 // Function to check if a port is in use
 function isPortInUse(port) {
@@ -67,11 +96,31 @@ async function killExistingMinima() {
   const cmd = process.platform === 'win32'
     ? 'taskkill /F /FI "IMAGENAME eq java.exe" /FI "WINDOWTITLE eq *minima*"'
     : "pkill -f 'java.*minima\\.jar'";
-
   return new Promise((resolve) => {
-    exec(cmd, () => {
-      // Wait a bit for the process to fully terminate
-      setTimeout(resolve, 2000);
+    exec(cmd, (error, stdout, stderr) => {
+      // Wait for process to actually terminate by checking if ports are free
+      const checkTermination = async () => {
+        try {
+          const [port9001InUse, port9003InUse] = await Promise.all([
+            isPortInUse(CONFIG.PORTS.MINIMA),
+            isPortInUse(CONFIG.PORTS.MDS)
+          ]);
+
+          if (!port9001InUse && !port9003InUse) {
+            // Processes have terminated
+            resolve();
+          } else {
+            // Still running, check again in 100ms
+            setTimeout(checkTermination, 100);
+          }
+        } catch (err) {
+          // If port check fails, wait a bit and resolve
+          setTimeout(resolve, 500);
+        }
+      };
+
+      // Start checking immediately
+      checkTermination();
     });
   });
 }
@@ -116,8 +165,6 @@ async function runMinima(password, win) {
     '-mdsenable',
     '-mdspassword', password
   ];
-  console.log('Starting Java with args:', args.filter(arg => arg !== password).concat(['[PASSWORD]']));
-
   // Check if Java is available before starting Minima
   try {
     const javaCheck = spawn('java', ['-version']);
@@ -140,30 +187,45 @@ async function runMinima(password, win) {
 
     // Handle process events
     java.on('error', (err) => {
-      console.error('Failed to start Java process:', err);
+      if (CONFIG.JAVA_LOG.ENABLED.PROCESS_EVENTS) {
+        console.error('Failed to start Java process:', err);
+      }
       win.webContents.executeJavaScript(`alert('Failed to start Minima: ${err.message}')`);
     });
 
     java.stdout.on('data', (data) => {
       const str = data.toString();
-      process.stdout.write(str);
-
-      // Check for specific output patterns
-      if (str.includes('SERIOUS ERROR loadAllDB')) {
-        win.webContents.send('database-lock-error');
-        return;
+      
+      // Log stdout if enabled
+      if (CONFIG.JAVA_LOG.ENABLED.STDOUT) {
+        process.stdout.write(str);
       }
 
-      if (!webviewAdded && str.includes('SSL server started on port 9003')) {
-        webviewAdded = true;
-        win.webContents.send('minima-ready');
+      // Check for specific output patterns if enabled
+      if (CONFIG.JAVA_LOG.ENABLED.PATTERN_MATCHING) {
+        if (str.includes(CONFIG.JAVA_LOG.PATTERNS.DATABASE_ERROR)) {
+          win.webContents.send('database-lock-error');
+          return;
+        }
+
+        if (!webviewAdded && str.includes(CONFIG.JAVA_LOG.PATTERNS.SSL_READY)) {
+          webviewAdded = true;
+          win.webContents.send('minima-ready');
+        }
       }
     });
 
-    java.stderr.on('data', (data) => process.stderr.write(data.toString()));
+    java.stderr.on('data', (data) => {
+      if (CONFIG.JAVA_LOG.ENABLED.STDERR) {
+        process.stderr.write(data.toString());
+      }
+    });
 
     java.on('close', code => {
       if (code !== 0 && code !== null) {
+        if (CONFIG.JAVA_LOG.ENABLED.PROCESS_EVENTS) {
+          console.log(`Java process exited with code ${code}`);
+        }
         win.webContents.executeJavaScript(`alert('Minima exited with code ${code}')`);
       }
     });
@@ -180,7 +242,8 @@ function createWindow() {
     title: app.getName(),
     icon: CONFIG.PATHS.ICON,
     transparent: true,
-    titleBarStyle: 'hidden',
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 45 / 2 - 12 / 2, y: 45 / 2 - 12 / 2 },
     vibrancy: 'fullscreen-ui', // Use 'light' for blur with white borders
     backgroundMaterial: "acrylic",
     webPreferences: {
@@ -204,6 +267,11 @@ function createWindow() {
   // Set up IPC event handlers
   setupIpcHandlers();
 
+  // Handle new-window events to prevent opening actual new windows
+  mainWindow.webContents.on('new-window', (event, navigationUrl) => {
+    event.preventDefault();
+  });
+
   // Handle window close event - minimize to tray instead
   mainWindow.on('close', (event) => {
     if (!app.isQuitting) {
@@ -224,6 +292,9 @@ function createWindow() {
   // Check Minima status and initialize
   initializeMinima();
 }
+
+// Create settings window
+// Settings functionality is now handled by SettingsManager module
 
 // Set up IPC event handlers
 function setupIpcHandlers() {
@@ -254,6 +325,19 @@ function setupIpcHandlers() {
       mainWindow.webContents.send('password-error', 'Password is required');
     }
   });
+
+  // Handle webview reload
+  ipcMain.on('reload-webview', () => {
+    mainWindow.webContents.send('minima-ready');
+  });
+
+  // Handle quit app
+  ipcMain.on('quit-app', () => {
+    // Trigger the quit confirmation dialog
+    app.quit();
+  });
+
+  // Settings IPC handlers are now managed by SettingsManager module
 }
 
 // Check Minima status and start accordingly
@@ -295,7 +379,7 @@ async function initializeMinima() {
 // Reset application data and restart
 async function resetApp() {
   const { dialog } = require('electron');
-  
+
   // Show native confirmation dialog
   const result = await dialog.showMessageBox(mainWindow, {
     type: 'warning',
@@ -306,12 +390,12 @@ async function resetApp() {
     message: 'Reset Minima Data',
     detail: 'This will permanently delete all Minima data and saved passwords. Are you sure?'
   });
-  
+
   // If user clicked Cancel (button index 0), return early
   if (result.response === 0) {
     return;
   }
-  
+
   try {
     if (app.isPackaged) {
       // Delete data directory if it exists
@@ -357,6 +441,12 @@ function createAppMenu() {
           click: resetApp
         },
         {
+          label: 'Settings',
+          click: () => {
+            settingsManager.createWindow();
+          }
+        },
+        {
           label: 'Show App Info',
           click: () => {
             const info = {
@@ -394,47 +484,7 @@ function createAppMenu() {
 }
 
 // Create system tray
-function createTray() {
-  const trayIcon = nativeImage.createFromPath(CONFIG.PATHS.TRAY_ICON).resize({ width: 16, height: 16 });
-  tray = new Tray(trayIcon);
-
-  const contextMenu = Menu.buildFromTemplate([
-    {
-      label: 'Show Minima',
-      click: () => {
-        mainWindow.show();
-        if (process.platform === 'darwin') {
-          app.dock.show();
-        }
-      }
-    },
-    { type: 'separator' },
-    {
-      label: 'Quit',
-      click: () => {
-        // Kill Java process before quitting
-        if (global.java && !global.java.killed) {
-          global.java.kill();
-        }
-        app.isQuitting = true;
-        app.quit();
-      }
-    }
-  ]);
-
-  tray.setToolTip('Minima');
-  tray.setContextMenu(contextMenu);
-
-  // For macOS, clicking the tray icon should show the window
-  if (process.platform === 'darwin') {
-    tray.on('click', () => {
-      if (!mainWindow.isVisible()) {
-        mainWindow.show();
-        app.dock.show();
-      }
-    });
-  }
-}
+// Tray functionality is now handled by TrayManager module
 
 // Initialize app when ready
 app.whenReady().then(() => {
@@ -445,14 +495,96 @@ app.whenReady().then(() => {
     app.dock.setIcon(CONFIG.PATHS.ICON);
   }
 
-  createTray();
+  // Initialize settings manager
+  settingsManager = new SettingsManager(CONFIG);
+
   createWindow();
+
+  // Initialize tray manager after window is created
+  trayManager = new TrayManager(CONFIG, mainWindow, () => settingsManager.createWindow());
+  trayManager.create();
 });
 
 // Handle macOS behavior where clicking the dock icon should re-open a window
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
+  }
+});
+
+// Handle quit confirmation dialog
+app.on('before-quit', async (event) => {
+  if (!app.isQuitting) {
+    event.preventDefault();
+
+    // Load settings to check quit behavior preference
+    const fs = require('fs');
+    const path = require('path');
+    let quitBehavior = 'ask';
+
+    try {
+      const settingsPath = path.join(app.getPath('userData'), 'settings.json');
+      if (fs.existsSync(settingsPath)) {
+        const settings = JSON.parse(fs.readFileSync(settingsPath, 'utf8'));
+        quitBehavior = settings.quitBehavior || 'ask';
+      }
+    } catch (error) {
+      console.error('Error loading quit behavior setting:', error);
+    }
+
+    let response;
+
+    if (quitBehavior === 'ask') {
+      // Show dialog if user wants to be asked every time
+      const { dialog } = require('electron');
+      const result = await dialog.showMessageBox(mainWindow, {
+        type: 'question',
+        title: 'Quit Minima',
+        message: 'Would you like to minimize instead?',
+        detail: 'Choose how you want to handle closing Minima:',
+        buttons: ['Minimize', 'Quit', 'Kill Immediately'],
+        defaultId: 0,
+        cancelId: 0
+      });
+      response = result.response;
+    } else {
+      // Use saved preference
+      switch (quitBehavior) {
+        case 'minimize':
+          response = 0;
+          break;
+        case 'quit':
+          response = 1;
+          break;
+        case 'kill':
+          response = 2;
+          break;
+        default:
+          response = 0;
+      }
+    }
+
+    switch (response) {
+      case 0: // Minimize
+        mainWindow.hide();
+        if (process.platform === 'darwin') {
+          app.dock.hide();
+        }
+        break;
+      case 1: // Quit Service (graceful shutdown)
+        if (global.java && !global.java.killed) {
+          global.java.kill();
+        }
+        await killExistingMinima();
+        app.isQuitting = true;
+        app.quit();
+        break;
+      case 2: // Kill Service (immediate quit)
+        app.isQuitting = true;
+        app.quit();
+        break;
+    }
+
   }
 });
 

@@ -1,5 +1,15 @@
 :root {
-    --title-bar-height: 50px;
+    --title-bar-height: 45px;
+}
+
+/* disable effects for back blur */
+* {
+    backdrop-filter: none !important;
+}
+
+header {
+    position: relative;
+    top: var(--title-bar-height);
 }
 
 div.grid.grid-cols-12.h-full>div.svg.col-span-9.flex.items-center.justify-end>div {
@@ -15,4 +25,15 @@ body,
 html {
     background: none !important;
     background-color: transparent !important;
+}
+
+#root>div.app>div:nth-child(4)>div {
+    top: var(--title-bar-height);
+    height: calc(100% - var(--title-bar-height));
+}
+
+/* app context menu */
+#root>div.app.bg.overflow-hidden.xl\:overflow-visible.custom-scrollbar>div.z-\[50\].md\:z-\[100\].absolute.bottom-0.left-0.w-full.transition-all.duration-20.origin-bottom.scale-y-100.opacity-100 {
+    overflow-y: auto;
+    max-height: calc(100% - var(--title-bar-height));
 }
