@@ -7,12 +7,13 @@
     "start": "electron .",
     "test": "echo \"Error: no test specified\" && exit 1",
     "postinstall": "node postscript.js",
-    "reset": "node -e \"const { app } = require('electron'); const path = require('path'); const dataPath = app.isPackaged ? path.join(app.getPath('userData'), 'minidata') : './minidata1'; require('fs').rmSync(dataPath, { recursive: true, force: true }); require('keytar').deletePassword('minima-electron','mds-password').then(()=>console.log('Password and data directory removed.'))\"",
+    "reset": "node -e \"const { app } = require('electron'); const path = require('path'); const dataPath = app?.isPackaged ? path.join(app.getPath('userData'), 'minidata') : './minidata1'; require('fs').rmSync(dataPath, { recursive: true, force: true }); require('keytar').deletePassword('minima-electron','mds-password').then(()=>console.log('Password and data directory removed.'))\"",
     "pack": "electron-builder --dir",
     "dist": "electron-builder",
     "make:mac": "electron-builder --mac --universal",
     "make:win": "electron-builder --win",
-    "make:linux": "electron-builder --linux"
+    "make:linux": "electron-builder --linux",
+    "install:mac": "npm run make:mac && APP_NAME=Minima.app && SRC=dist/mac-universal/$APP_NAME && DEST=/Applications/$APP_NAME && [ -d \"$SRC\" ] && rm -rf \"$DEST\" && mv \"$SRC\" \"$DEST\" && echo 'Installed/Updated $APP_NAME in /Applications.'"
   },
   "keywords": [],
   "author": "",
