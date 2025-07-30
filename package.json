@@ -1,11 +1,10 @@
 {
   "name": "minima-electron",
   "productName": "Minima Electron",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "main": "index.js",
   "scripts": {
     "start": "electron .",
-    "start:prod": "electron . --force-user-path",
     "test": "echo \"Error: no test specified\" && exit 1",
     "postinstall": "node postscript.js",
     "reset": "node reset.js",
@@ -36,7 +35,9 @@
       "!minidata/**/*"
     ],
     "extraResources": [
-      "minima.jar"
+      "minima.jar",
+      "assets/icon.png",
+      "assets/tray/tray.png"
     ],
     "directories": {
       "buildResources": "assets"
@@ -46,21 +47,21 @@
       "target": [
         "dmg"
       ],
-      "icon": "assets/icon.iconset",
+      "icon": "assets/icon.png",
       "artifactName": "${productName}-${version}-universal.${ext}"
     },
     "win": {
       "target": [
         "nsis"
       ],
-      "icon": "assets/icon.iconset/icon_256x256.png"
+      "icon": "assets/icon.png"
     },
     "linux": {
       "target": [
         "AppImage",
         "deb"
       ],
-      "icon": "assets/icon.iconset/icon_512x512.png",
+      "icon": "assets/icon.png",
       "category": "Finance"
     },
     "nsis": {
