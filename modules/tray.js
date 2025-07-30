@@ -10,8 +10,14 @@ class TrayManager {
   }
 
   create() {
-    const trayIcon = nativeImage.createFromPath(this.config.PATHS.TRAY_ICON).resize({ width: 16, height: 16 });
-    this.tray = new Tray(trayIcon);
+    try {
+      const trayIcon = nativeImage.createFromPath(this.config.PATHS.TRAY_ICON).resize({ width: 16, height: 16 });
+      this.tray = new Tray(trayIcon);
+    } catch (error) {
+      console.warn('Failed to create tray icon:', error.message);
+      // Create tray without icon as fallback
+      this.tray = new Tray(nativeImage.createEmpty());
+    }
 
     const contextMenu = Menu.buildFromTemplate([
       {

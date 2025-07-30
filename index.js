@@ -25,8 +25,8 @@ const CONFIG = {
   PATHS: {
     JAR: app.isPackaged ? path.join(process.resourcesPath, 'minima.jar') : 'minima.jar',
     DATA_DIR: app.isPackaged || process.argv.includes('--force-user-path') ? path.join(app.getPath('userData'), 'minidata') : 'minidata1',
-    ICON: path.join(__dirname, 'assets/icon.png'),
-    TRAY_ICON: path.join(__dirname, 'assets/tray/tray.png')
+    ICON: app.isPackaged ? path.join(process.resourcesPath, 'assets/icon.png') : path.join(__dirname, 'assets/icon.png'),
+    TRAY_ICON: app.isPackaged ? path.join(process.resourcesPath, 'assets/tray/tray.png') : path.join(__dirname, 'assets/tray/tray.png')
   },
   JAVA_LOG: {
     ENABLED: {
@@ -466,13 +466,13 @@ function createAppMenu() {
             });
           }
         },
-        {
+        ...(app.isPackaged ? [] : [{
           label: 'Open DevTools',
           click: () => {
             const win = BrowserWindow.getFocusedWindow();
             if (win) win.webContents.openDevTools();
           }
-        },
+        }]),
         { type: 'separator' },
         { role: 'quit' }
       ]
@@ -535,7 +535,11 @@ app.whenReady().then(() => {
 
   // For macOS, set the dock icon
   if (process.platform === 'darwin') {
-    app.dock.setIcon(CONFIG.PATHS.ICON);
+    try {
+      app.dock.setIcon(CONFIG.PATHS.ICON);
+    } catch (error) {
+      console.warn('Failed to set dock icon:', error.message);
+    }
   }
 
   // Initialize settings manager
@@ -546,6 +550,8 @@ app.whenReady().then(() => {
   // Initialize tray manager after window is created
   trayManager = new TrayManager(CONFIG, mainWindow, () => settingsManager.createWindow());
   trayManager.create();
+}).catch((error) => {
+  console.error('Failed to initialize app:', error);
 });
 
 // Handle macOS behavior where clicking the dock icon should re-open a window
